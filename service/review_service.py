@@ -17,7 +17,7 @@ LABEL_TEXT = {0: "negative", 1: "positive"}  # đổi nếu mapping khác
 
 class ReviewService():
     def __init__(self):
-        self.path_model = "artifacts/textclf.pkl"
+        self.path_model = "artifacts/textclf2.pkl"
         self.model = self.load_artifact(self.path_model)
     def load_artifact(self, path_to_artifact):
         '''Load a prediction artifact from a pickle file'''
