@@ -207,7 +207,7 @@ st.markdown("""
 st.markdown("<br><br>", unsafe_allow_html=True)
 
 #API
-API_URL = "https://review-sentiment-app.onrender.com/predict"
+API_URL = "https://group-8-dseb66b-analyze-reviews-and.onrender.com/predict"
 
 #Input raw text & upload file
 left, center, right = st.columns([1, 6, 1])
