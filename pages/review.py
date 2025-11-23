@@ -7,9 +7,13 @@ from pathlib import Path
 #Title
 st.set_page_config(page_title="Movie Analytic & Recommendation", page_icon="🎬", layout="wide")
 
+#Path
+like = Path.cwd() / "iamges" / "LIKE.gif"
+disklike = Path.cwd() / "iamges" / "DISLIKE.gif"
+image_path = Path.cwd() / "iamges" / "BG.jpg"
+logo_path = Path.cwd() / "iamges" / "LOGO.png"
 
 #Background
-image_path = Path.cwd() / "images" / "BG.jpg"
 with open(image_path, "rb") as image_file:
     encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
 image_url = f"data:image/jpeg;base64,{encoded_image}"
@@ -143,11 +147,13 @@ st.markdown("""
 
 st.markdown(f"""
     <style>
+    /* Background */
     [data-testid="stAppViewContainer"] {{
         background: url("{image_url}") no-repeat center center fixed !important;
         background-size: cover !important;
     }}
 
+    /* Header */
     [data-testid="stHeader"] {{
         background: rgba(0,0,0,0) !important;
     }}
@@ -188,12 +194,10 @@ def show_alert(message: str, kind: str = "info"):
 #Navigation
 col_img, col1, col2 = st.columns([2, 2, 2])
 with col_img:
-    logo_path = Path.cwd() / "images" / "LOGO.png"
     st.image(str(logo_path), width=300)
 with col1:
     if st.button("Homepage", use_container_width=True):
         st.switch_page("homepage.py")            
-
 with col2:
     if st.button("Movies Recommendations", use_container_width=True):
         st.switch_page("pages/recommendations.py") 
@@ -207,7 +211,7 @@ st.markdown("""
 st.markdown("<br><br>", unsafe_allow_html=True)
 
 #API
-API_URL = "https://group-8-dseb66b-analyze-reviews-and.onrender.com/predict"
+API_URL = "https://review-sentiment-app.onrender.com/predict"
 
 #Input raw text & upload file
 left, center, right = st.columns([1, 6, 1])
@@ -215,7 +219,23 @@ with center:
     col3, col4 = st.columns([2, 1])
     with col3:
         st.markdown("<div style='font-family:Courier prime, cursive; font-size:30px;'>Write your movie review here</div>", unsafe_allow_html=True)
-        raw_text = st.text_area("", placeholder="Text area...", height=250)
+
+        #If there is no state, create it
+        if "reset_textarea" not in st.session_state:
+            st.session_state.reset_textarea = False
+
+        #When reset requested, clear value stored in session_state
+        if st.session_state.reset_textarea:
+            st.session_state.raw_text = ""
+            st.session_state.reset_textarea = False
+
+        raw_text = st.text_area(
+            "",
+            placeholder="Text area...",
+            height=250,
+            key="raw_text"
+        )
+
     with col4:
         st.markdown("<div style='font-family:Courier prime, cursive; font-size:30px;'>Your review file</div>", unsafe_allow_html=True)
         st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
@@ -226,23 +246,54 @@ df = pd.DataFrame()
 
 left, center, right = st.columns([1, 6, 1])
 with center:
-    if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-        df_preview = df.copy()
-        df_preview = df_preview.loc[:, ~df_preview.columns.str.contains('^No$|^Unnamed')]
-        st.write("#### Data preview")
-        st.dataframe(df_preview.head(), hide_index=True)
+    #If there is no state, create it
+    if "file_uploaded" not in st.session_state:
+        st.session_state.file_uploaded = False
 
-    elif raw_text:
-        lines = raw_text.strip().split('\n')
+    #If there is no file, reset status
+    if uploaded_file is None:
+        st.session_state.file_uploaded = False
+
+    #When users upload files
+    if uploaded_file is not None:
+        #Rerun only once after user uploads file
+        if not st.session_state.file_uploaded:
+            st.session_state.file_uploaded = True
+            st.session_state.reset_textarea = True
+            st.rerun()
+
+        #After rerun, uploaded_file is returned normally
+        if uploaded_file is not None:
+            df = pd.read_csv(uploaded_file)
+            df_preview = df.copy()
+            df_preview = df_preview.loc[:, ~df_preview.columns.str.contains('^No$|^Unnamed')]
+            st.write("#### Data preview")
+            st.dataframe(df_preview.head(), hide_index=True)
+
+    #When users write text
+    elif raw_text.strip():
+        lines = raw_text.strip().split("\n")
         df = pd.DataFrame({"Review": lines})
         st.write("#### Your review:")
         st.dataframe(df, hide_index=True)
-    Analyze = st.button(label = "Analyze")
+
+    Analyze = st.button(label="Analyze")
+    alert_placeholder = st.empty()
+
 
 #Send Data to API
-alert_placeholder = st.empty()
 if Analyze:
+    #If no data's imported
+    if (not raw_text.strip()) and (uploaded_file is None):
+        left, center, right = st.columns([1, 6, 1])
+        with center:
+            alert_placeholder.markdown("""
+                <div style="padding:16px; border:2px solid #000; 
+                border-radius:8px; background:#fff4e5; font-size:18px;">
+                    ⚠️ Please input your movie review
+                </div>
+            """, unsafe_allow_html=True)
+        st.stop()
     #If user import text
     if raw_text and uploaded_file is None:
         lines = raw_text.strip().split('\n')
@@ -250,9 +301,8 @@ if Analyze:
         input_data = {"text": lines}
         
         with alert_placeholder:
-            left, center, right = st.columns([1, 6, 1])
-            with center:
-                show_alert(f"⏳ Sending data to API... please wait a moment.", kind="info")
+            show_alert(f"⏳ Sending data to API... please wait a moment.", kind="info")
+        
         try:
             result = requests.post(API_URL, json=input_data)
             response_json = result.json()
@@ -264,6 +314,7 @@ if Analyze:
                 first_result.reset_index(inplace=True)
                 first_result.rename(columns={"index": "No"}, inplace=True)
                 first_result["No"] = first_result["No"] + 1
+
                 #Results Display
                 if "pred" in first_result.columns:
                     counts = first_result["pred"].str.lower().value_counts(dropna=False)
@@ -273,16 +324,17 @@ if Analyze:
                     total = len(first_result)
                     pos_rate = pos / total if total else 0.0
                     neg_rate = neg / total if total else 0.0
+
                 left, center, right = st.columns([1, 6, 1])
                 with center:
                     show_alert(f"✅ Analyzis successful!", kind="success")
                     st.markdown("### Results Table")
+
                     col5, col6 = st.columns([2, 1])
                     with col5:
                         st.dataframe(first_result[["No", "review", "pred", "score"]], hide_index=True)
                     with col6:
-                        like = Path.cwd() / "images" / "LIKE.gif"
-                        disklike = Path.cwd() / "images" / "DISLIKE.gif"
+                        #LIKE
                         if pos_rate >= 0.5:
                             st.markdown(
                                 f"""
@@ -292,6 +344,7 @@ if Analyze:
                                 """,
                                 unsafe_allow_html=True
                             )
+                        #DISLIKE
                         else:
                             st.markdown(
                                 f"""
@@ -325,17 +378,16 @@ if Analyze:
             #Assume the first column contains reviews
             text_col = df.columns[1] if len(df.columns) > 1 else df.columns[0]
             texts = df[text_col].astype(str).tolist()
-
             input_data = {"text": texts}
+
             with alert_placeholder:
-                left, center, right = st.columns([1, 6, 1])
-                with center:
-                    show_alert(f"⏳ Sending data to API... please wait a moment.", kind="info")
+                show_alert(f"⏳ Sending data to API... please wait a moment.", kind="info")
+
             result = requests.post(API_URL, json=input_data, timeout=60)
             response_json = result.json()
             alert_placeholder.empty()
 
-            if isinstance(response_json, list):
+            if isinstance(response_json, list) and len(response_json) > 0:
                 #Convert list dict to DataFrame
                 df_result = pd.DataFrame(response_json)
                 df_result.reset_index(inplace=True)
@@ -343,9 +395,6 @@ if Analyze:
                 df_result["No"] = df_result["No"] + 1
 
                 #Results Display
-                left, center, right = st.columns([1, 6, 1])
-                with center:
-                    show_alert(f"✅ Analyzis successful!", kind="success")
                 if "pred" in df_result.columns:
                     counts = df_result["pred"].str.lower().value_counts(dropna=False)
                     pos = int(counts.get("positive", 0))
@@ -354,20 +403,17 @@ if Analyze:
                     total = len(df_result)
                     pos_rate = pos / total if total else 0.0
                     neg_rate = neg / total if total else 0.0
-        
-
+                
                 left, center, right = st.columns([1, 6, 1])
                 with center:
+                    show_alert(f"✅ Analyzis successful!", kind="success")
                     st.markdown("### Results Table")
-                left, center, right = st.columns([1, 6, 1])
-                with center:
+
                     col7, col8 = st.columns([2, 1])
                     with col7:
                         st.dataframe(df_result[["No", "review", "pred", "score"]], hide_index=True)
-
                     with col8:
-                        like = Path.cwd() / "images" / "LIKE.gif"
-                        disklike = Path.cwd() / "images" / "DISLIKE.gif"
+                        #LIKE
                         if pos_rate >= 0.5:
                             st.markdown(
                                 f"""
@@ -377,6 +423,7 @@ if Analyze:
                                 """,
                                 unsafe_allow_html=True
                             )
+                        #DISLIKE
                         else:
                             st.markdown(
                                 f"""
