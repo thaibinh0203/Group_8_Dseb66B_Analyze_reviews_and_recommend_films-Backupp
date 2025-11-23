@@ -7,7 +7,7 @@ import numpy as np
 from collections import Counter
 import os
 
-#  PATH & KEYS
+# ===================== PATH & KEYS ======================
 BASE_DIR = Path(os.path.abspath(__file__)).parents[1]
 LOGO_PATH = BASE_DIR / "images" / "LOGO.png"
 
@@ -20,10 +20,10 @@ BG_PATH = BASE_DIR / "images" / "BG.jpg"
 with open(BG_PATH, "rb") as f:
     encoded = b64encode(f.read()).decode()
 
-#  PAGE CONFIG 
-st.set_page_config(page_title="Movie Recommender", page_icon="🎬", layout="wide")
+# ===================== PAGE CONFIG ======================
+st.set_page_config(page_title="RCM • Movie Recommender", layout="wide")
 
-#  FONTS + CONTAINER 
+# ===================== FONTS + CONTAINER =================
 st.markdown("""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,10 +41,14 @@ st.markdown(f"""
     background-repeat: repeat;
     background-size: cover;
 }}
+
+[data-testid="stHeader"] {{
+    background: rgba(0,0,0,0) !important;
+}}
 </style>
 """, unsafe_allow_html=True)
 
-#  LOGO + NAVIGATION 
+# ===================== LOGO + NAVIGATION ==========================
 col_img, col1, col2 = st.columns([3, 3, 3])
 
 with col_img:    
@@ -62,14 +66,14 @@ with col2:
     if st.button("Analyze Your Reviews", use_container_width=True):
         st.switch_page("pages/review.py")
 
-# STICKER 
+# ====================== STICKER ================================
 STICKER_PATH = BASE_DIR / "images" / "sticker 92.png"
 with open(STICKER_PATH, "rb") as f:
     sticker_encoded = b64encode(f.read()).decode()
 
 st.markdown("""
 <style>
-/*  HERO CONTAINER (CHA)  */
+/* ========= HERO CONTAINER (CHA) ========= */
 .hero-container {
     width: 100%;
     display: flex;
@@ -77,7 +81,7 @@ st.markdown("""
     position: relative;
 }
                 
-/*  STICKER  */
+/* ========= STICKER ========= */
 .sticker-container {
     width: 280px;
     margin-left: -187px;
@@ -91,7 +95,7 @@ st.markdown("""
     animation: bob 3s ease-in-out infinite;
 }
 
-/*  TEXT = */
+/* ========= TEXT ========== */
 .hero-text {
     position: absolute;
     top: 19%; 
@@ -129,9 +133,9 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-#  INPUT BOX + RECOMMEND BUTTON + GALLERY =           
+# ============== INPUT BOX + RECOMMEND BUTTON + GALLERY ================           
 st.markdown("""<style>
-/* = INPUT BOX = */
+/* ======= INPUT BOX ======= */
 .stSelectbox label { display:none; }
 .stSelectbox > div > div { height:60px; }
 
@@ -150,7 +154,7 @@ div[data-baseweb="select"] * {
     align-items: center;
 }
 
-/* = 2 FUNCTION & RECOMMEND BUTTONS = */
+/* ======= 2 FUNCTION & RECOMMEND BUTTONS ======= */
 div[data-testid="stVerticalBlock"] button{
     height:65px; border:3px solid var(--ink); border-radius:11px; background:var(--lime);
     box-shadow:5px 5px 10px 1px var(--pink); transition:transform .15s ease; align-items:center;
@@ -163,6 +167,7 @@ div[data-testid="stVerticalBlock"] button:hover{
 }
 </style> """, unsafe_allow_html=True)
 
+# ===================== TMDB POSTER ======================
 class MyTfidfVectorizer:
     def __init__(self):
         self.vocab_ = {}
@@ -209,6 +214,9 @@ class MyTfidfVectorizer:
 
         # 5. TF-IDF = TF * IDF
         X *= idf
+
+        # (Có thể chuẩn hóa theo độ dài doc nếu muốn giống sklearn hơn,
+        # nhưng ở đây để đơn giản, chuẩn hóa sẽ làm ở bước cosine)
         return X
 def cosine_similarity_custom(X: np.ndarray) -> np.ndarray:
     """
@@ -264,6 +272,7 @@ def load_data():
     df["tags"] = df["tags"].apply(lambda x: " ".join(x))
     df = df[["movie_id","title","overview","tags"]]
 
+    # ======= DÙNG TF-IDF & COSINE TỰ CODE =======
     tfidf = MyTfidfVectorizer()
     # .values để đảm bảo là list/array các chuỗi
     vectors = tfidf.fit_transform(df["tags"].values)
@@ -290,7 +299,7 @@ def fetch_trailer(movie_id):
             return f"https://www.youtube.com/watch?v={key}"
     return None
 
-#  RECOMMEND GALLERY 
+# ===================== RECOMMEND GALLERY ===================
 def recommend(title, top_k=10):
     # vị trí phim được chọn
     index = movies[movies["title"] == title].index[0]
@@ -307,7 +316,7 @@ def recommend(title, top_k=10):
         picks.append((row["title"], row["movie_id"]))
     return picks
 
-#  INPUT + BUTTON 
+# ===================== INPUT + BUTTON ===================
 c1, cbtn, _ = st.columns([6, 2, 0.1])
 
 with c1:
@@ -319,10 +328,10 @@ if run and not selected:
     st.markdown('<div class="gallery-title">Please select a movie first!</div>', unsafe_allow_html=True)
     run = False
 
-#  GALLERY STYLES 
+# ===================== GALLERY STYLES ===================
 st.markdown(""" 
 <style>
-/* = GALLERY = */
+/* ======= GALLERY ======= */
 .gallery-title{
     text-align:center; font-family:'Courier Prime',monospace; font-weight:700;
     font-size:26px; margin:10px 0 20px; color:var(--ink);
@@ -391,7 +400,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)   
 
-#  RESULTS 
+# ===================== RESULTS ==========================
 import textwrap
 if run:
     recs = recommend(selected, top_k=10)
