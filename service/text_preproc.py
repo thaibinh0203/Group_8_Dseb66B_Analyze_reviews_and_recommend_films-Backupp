@@ -4,44 +4,76 @@ import numpy as np
 import re
 from bs4 import BeautifulSoup
 import nltk
-def clean_text(text):
-    # 2.1 Xóa HTML bằng BeautifulSoup (chính xác hơn Regex)
-    text = BeautifulSoup(text, "html.parser").get_text()
+############# CLEANING DATA (UPDATED WITH NEGATION HANDLING) ##################
 
-    # 2.2 Xóa HTML còn sót lại bằng Regex (dự phòng)
+import re
+from bs4 import BeautifulSoup
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+import nltk
+
+# Từ phủ định cần giữ lại
+NEGATION_WORDS = {
+    "not","no","nor","never","without",
+    "n't", "dont","don't","cant","can't","cannot","wont","won't",
+    "isnt","isn't","arent","aren't","wasnt","wasn't",
+    "werent","weren't","shouldnt","shouldn't","wouldnt","wouldn't",
+    "couldnt","couldn't","mustnt","mustn't"
+}
+
+def handle_negation(tokens):
+    new_tokens = []
+    neg_left = 0
+
+    for tok in tokens:
+        # Nếu token đã NEG_ rồi thì giữ nguyên
+        if tok.startswith("NEG_"):
+            new_tokens.append(tok)
+            continue
+
+        if tok in NEGATION_WORDS:
+            neg_left = 2
+            new_tokens.append(tok)
+        elif neg_left > 0:
+            new_tokens.append("NEG_" + tok)
+            neg_left -= 1
+        else:
+            new_tokens.append(tok)
+
+    return new_tokens
+
+
+
+def clean_text(text):
+    # 1) Xóa HTML
+    text = BeautifulSoup(text, "html.parser").get_text()
     text = re.sub(r'<.*?>', '', text)
 
-    # 2.3 Chuyển toàn bộ về chữ thường (lowercase) để tránh phân biệt "Học" vs "học"
+    # 2) Lowercase
     text = text.lower()
 
-    # 2.4 Xóa ký tự đặc biệt, số, dấu câu — chỉ giữ lại chữ cái (có hỗ trợ tiếng Việt)
-    text = re.sub(r'[^a-zA-Zà-ỹÀ-Ỹ\s]', '', text)
+    # 3) Giữ lại chữ cái (có hỗ trợ tiếng Việt)
+    text = re.sub(r"[^a-zA-Zà-ỹÀ-Ỹ\s]", " ", text)
 
-    # 2.5 Xóa khoảng trắng dư thừa
-    text = re.sub(r'\s+', ' ', text).strip()
+    # 4) Xóa khoảng trắng dư
+    text = re.sub(r"\s+", " ", text).strip()
 
-    # 2.6 Xóa stopwords (bao gồm cả tiếng Anh + tiếng Việt tự thêm vào)
-   # stopwords tiếng Anh gốc
+    # 5) Tokenize
+    tokens = text.split()
+
+    # 6) Loại stopwords TRỪ TỪ PHỦ ĐỊNH
     stop_words = set(ENGLISH_STOP_WORDS)
+    stop_words = stop_words.difference(NEGATION_WORDS)
+    tokens = [t for t in tokens if t not in stop_words]
 
-    # *** GIỮ LẠI CÁC TỪ PHỦ ĐỊNH ***
-    neg_keep = {
-        "not", "no", "nor", "never", "without",
-        "n't",  # để giữ dạng don't/doesn't... nếu bạn giữ dấu '
-        "cannot", "cant", "can't", "dont", "don't", "wont", "won't",
-        "isnt", "isn't", "arent", "aren't", "wasnt", "wasn't",
-        "werent", "weren't", "shouldnt", "shouldn't", "wouldnt", "wouldn't",
-        "couldnt", "couldn't", "mustnt", "mustn't"
-    }
-    stop_words = stop_words.difference(neg_keep)
+    # 7) ÁP DỤNG NEGATION HANDLING  🔥
+    tokens = handle_negation(tokens)
 
-    # Lọc stopwords
-    text = ' '.join([word for word in text.split() if word not in stop_words])
-    # 2.7 Stemming (ví dụ running -> run, learners -> learn)
-    stemmer = nltk.stem.SnowballStemmer('english')
-    words = text.split()                     # <-- lấy token sau 2.6
-    words = [stemmer.stem(w) for w in words] # <-- stem từng từ tiếng Anh
-    text = ' '.join(words)                   # <-- ghép lại thành chuỗi
-    return text
+    # 8) Stemming
+    stemmer = nltk.stem.SnowballStemmer("english")
+    tokens = [stemmer.stem(t) for t in tokens]
+
+    # 9) Ghép lại
+    return " ".join(tokens)
+
 def _clean_batch(X):
     return np.array([clean_text(t) for t in X], dtype=object)
